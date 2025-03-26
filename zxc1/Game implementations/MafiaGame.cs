@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using zxc1.Base_classes;
 using zxc1.Interfaces;
+using zxc1.observerPattern;
 using zxc1.Player_implementation;
 
 namespace zxc1.Game_implementations
@@ -17,7 +18,10 @@ namespace zxc1.Game_implementations
         private readonly IDayPhaseService _dayPhaseService;
         private bool _rulesRead = false;
 
-        public event EventHandler<GameRulesEventArgs> RulesAnnounced;
+        private readonly GameRulePublisher _rulePublisher;
+        private List<IDisposable> _ruleSubscriptions = new List<IDisposable>();
+
+      
 
         public MafiaGame(
             IRoleDistributor roleDistributor,
@@ -28,13 +32,20 @@ namespace zxc1.Game_implementations
             _roleDistributor = roleDistributor;
             _nightPhaseService = nightPhaseService;
             _dayPhaseService = dayPhaseService;
+            _rulePublisher = new GameRulePublisher();
+
+            _ruleSubscriptions.Add(_rulePublisher.Subscribe(new ConsoleRuleObserver()));
+
+            _rulePublisher.RulesAnnounced += (sender, args) =>
+            {
+                _rulesRead = true;
+                Console.WriteLine("\nПравила прочитано! Тепер ви можете почати гру.");
+            };
         }
 
         private void AnnounceRules()
         {
             string rules = @"
-=== ПРАВИЛА ГРИ МАФІЯ ===
-
 Мета гри:
 Виявити та усунути мафію або захопити місто, якщо ви на боці мафії.
 
@@ -48,7 +59,7 @@ namespace zxc1.Game_implementations
 Бажаємо приємної гри!
 ";
 
-            OnRulesAnnounced(new GameRulesEventArgs("Мафія", rules));
+            _rulePublisher.PublishRules("Мафія", rules);
         }
         public void AddPlayer()
         {
@@ -58,11 +69,12 @@ namespace zxc1.Game_implementations
             Console.WriteLine($"Гравець {name} доданий!");
         }
 
-        private void OnRulesAnnounced(GameRulesEventArgs e)
+        public void Dispose()
         {
-            RulesAnnounced?.Invoke(this, e);
-            _rulesRead = true;
-            Console.WriteLine("\nПравила прочитано! Тепер ви можете почати гру.");
+            foreach (var subscription in _ruleSubscriptions)
+            {
+                subscription.Dispose();
+            }
         }
         public void StartGame()
         {
@@ -173,15 +185,6 @@ namespace zxc1.Game_implementations
 
         public void PlayGame()
         {
-            RulesAnnounced += (sender, args) =>
-            {
-                Console.WriteLine(args.Rules);
-                Console.WriteLine("Натисніть Enter, щоб продовжити...");
-                Console.ReadLine();
-
-               
-                Console.Clear();
-            };
             bool exit = false;
             while (!exit)
             {

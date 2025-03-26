@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace zxc1.Interfaces
 {
     public interface IGame
-    {
+    { 
         void AddPlayer();
         void PlayGame();
     }
