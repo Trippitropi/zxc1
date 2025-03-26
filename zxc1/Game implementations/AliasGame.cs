@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using zxc1.Base_classes;
 using zxc1.Interfaces;
+using zxc1.observerPattern;
 using zxc1.players;
 
 namespace zxc1.Game_implementations
@@ -19,7 +20,11 @@ namespace zxc1.Game_implementations
         private const int WordsPerRound = 5;
         private bool _rulesRead = false;
 
-        public event EventHandler<GameRulesEventArgs> RulesAnnounced;
+        private readonly GameRulePublisher _rulePublisher;
+        private List<IDisposable> _ruleSubscriptions = new List<IDisposable>();
+
+
+      
         public AliasGame()
         {
             _players = new List<IPlayer>();
@@ -34,6 +39,15 @@ namespace zxc1.Game_implementations
         };
             _currentTeamIndex = 0;
             _random = new Random();
+            _rulePublisher = new GameRulePublisher();
+
+            _ruleSubscriptions.Add(_rulePublisher.Subscribe(new ConsoleRuleObserver()));
+
+            _rulePublisher.RulesAnnounced += (sender, args) =>
+            {
+                _rulesRead = true;
+                Console.WriteLine("\nПравила прочитано! Тепер ви можете почати гру.");
+            };
         }
 
 
@@ -58,7 +72,7 @@ namespace zxc1.Game_implementations
 Бажаємо приємної гри!
 ";
 
-            OnRulesAnnounced(new GameRulesEventArgs("Мафія", rules));
+            _rulePublisher.PublishRules("Еліас", rules);
         }
 
         public void AddPlayer()
@@ -67,6 +81,14 @@ namespace zxc1.Game_implementations
             string name = Console.ReadLine();
             _players.Add(new Player(name));
             Console.WriteLine($"Гравець {name} доданий!");
+        }
+
+        public void Dispose()
+        {
+            foreach (var subscription in _ruleSubscriptions)
+            {
+                subscription.Dispose();
+            }
         }
 
         public void CreateTeams()
@@ -111,12 +133,6 @@ namespace zxc1.Game_implementations
             }
         }
 
-        private void OnRulesAnnounced(GameRulesEventArgs e)
-        {
-            RulesAnnounced?.Invoke(this, e);
-            _rulesRead = true;
-            Console.WriteLine("\nПравила прочитано! Тепер ви можете почати гру.");
-        }
         public void PlayRound()
         {
             if (!_rulesRead)
@@ -203,13 +219,7 @@ namespace zxc1.Game_implementations
 
         public void PlayGame()
         {
-            RulesAnnounced += (sender, args) =>
-            {
-                Console.WriteLine(args.Rules);
-                Console.WriteLine("Натисніть Enter, щоб продовжити...");
-                Console.ReadLine();
-            };
-
+           
             bool exit = false;
             while (!exit)
             {

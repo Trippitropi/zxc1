@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using zxc1.Base_classes;
 using zxc1.Interfaces;
+using zxc1.observerPattern;
 
 namespace zxc1.Monopoly
 {
@@ -18,8 +19,9 @@ namespace zxc1.Monopoly
         private int _currentPlayerIndex;
         private bool _rulesRead = false;
 
-        
-        public event EventHandler<GameRulesEventArgs> RulesAnnounced;
+
+        private readonly GameRulePublisher _rulePublisher;
+        private List<IDisposable> _ruleSubscriptions = new List<IDisposable>();
 
         public MonopolyGame()
         {
@@ -29,6 +31,16 @@ namespace zxc1.Monopoly
             _dice = new MonopolyDice();
             _random = new Random();
             _currentPlayerIndex = 0;
+
+            _rulePublisher = new GameRulePublisher();
+
+            _ruleSubscriptions.Add(_rulePublisher.Subscribe(new ConsoleRuleObserver()));
+
+            _rulePublisher.RulesAnnounced += (sender, args) =>
+            {
+                _rulesRead = true;
+                Console.WriteLine("\nПравила прочитано! Тепер ви можете почати гру.");
+            };
         }
 
         private List<MonopolyProperty> InitializeProperties()
@@ -52,11 +64,12 @@ namespace zxc1.Monopoly
             return properties;
         }
 
-        private void OnRulesAnnounced(GameRulesEventArgs e)
+        public void Dispose()
         {
-            RulesAnnounced?.Invoke(this, e);
-            _rulesRead = true;
-            Console.WriteLine("\nПравила прочитано! Тепер ви можете почати гру.");
+            foreach (var subscription in _ruleSubscriptions)
+            {
+                subscription.Dispose();
+            }
         }
 
         private void AnnounceRules()
@@ -76,7 +89,7 @@ namespace zxc1.Monopoly
 Бажаємо приємної гри!
 ";
 
-            OnRulesAnnounced(new GameRulesEventArgs("Монополія", rules));
+            _rulePublisher.PublishRules("Монополія", rules);
         }
 
         public void AddPlayer()
@@ -229,13 +242,6 @@ namespace zxc1.Monopoly
         public void PlayGame()
         {
            
-            RulesAnnounced += (sender, args) =>
-            {
-                Console.WriteLine(args.Rules);
-                Console.WriteLine("Натисніть Enter, щоб продовжити...");
-                Console.ReadLine();
-            };
-
             bool exit = false;
             while (!exit)
             {
